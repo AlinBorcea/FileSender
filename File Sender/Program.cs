@@ -25,8 +25,13 @@ namespace File_Sender
             {
                 FileManager.ClearDir(FileManager.Parrot);
                 FileManager.EncryptDir(userInput.DirPath, FileManager.Parrot);
-                //socketHandler.RunClient();
+                socketHandler.RunClient();
             }
+
+            if (socketHandler.WasSuccessful)
+                Console.WriteLine("Program Was Successful!");
+            else
+                Console.WriteLine("Program Failed!");
 
             Console.Write("Press Enter To Continue...");
             Console.Read();

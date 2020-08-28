@@ -11,6 +11,7 @@ public class SocketHandler
     private IPAddress iPAddress;
     private IPEndPoint iPEndPoint;
 
+    public bool WasSuccessful { get; set; }
     public SocketHandler(UserInput userInput)
     {
         user = userInput;
@@ -25,9 +26,10 @@ public class SocketHandler
             Console.WriteLine(e.ToString());
             Environment.Exit(1);
         }
+        WasSuccessful = false;
     }
 
-    public bool RunServer()
+    public void RunServer()
     {
         try
         {
@@ -38,18 +40,31 @@ public class SocketHandler
             Socket handler = socket.Accept();
             Console.WriteLine("Connected to {0}", handler.RemoteEndPoint.ToString());
 
+            FileStream stream;
             byte[] countBuffer = new byte[4];
-            int fileCount;
+            byte[] nameBuffer;
+            byte[] contentBuffer;
+            int fileCount, recvBytes;
 
             handler.Receive(countBuffer);
             fileCount = BitConverter.ToInt32(countBuffer);
 
-            byte[] fileNameBuffer = new byte[32];
             for (int i = 0; i < fileCount; i++)
             {
-                handler.Receive(fileNameBuffer);
-                //string path = FileManager.GetFileName(Encoding.ASCII.GetString(fileNameBuffer));
-                //File.Create(path);
+                handler.Receive(countBuffer);
+                recvBytes = BitConverter.ToInt32(countBuffer);
+                nameBuffer = new byte[recvBytes];
+                handler.Receive(nameBuffer);
+
+                stream = File.Create($"{FileManager.Turtle}/{Encoding.UTF8.GetString(nameBuffer)}");
+
+                handler.Receive(countBuffer);
+                recvBytes = BitConverter.ToInt32(countBuffer);
+                contentBuffer = new byte[recvBytes];
+                handler.Receive(contentBuffer);
+
+                stream.Write(contentBuffer);
+                stream.Close();
             }
 
             handler.Close();
@@ -59,12 +74,12 @@ public class SocketHandler
         catch (Exception e)
         {
             Console.WriteLine(e.ToString());
-            return false;
+            WasSuccessful = false;
         }
-        return true;
+        WasSuccessful = true;
     }
 
-    public bool RunClient()
+    public void RunClient()
     {
         Socket socket = new Socket(iPAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         try
@@ -72,31 +87,35 @@ public class SocketHandler
             socket.Connect(iPEndPoint);
             Console.WriteLine("Connected to {0}", socket.RemoteEndPoint.ToString());
 
-            try
-            {
-                string[] fileNames = Directory.GetFiles(FileManager.Parrot);
-                byte[] countBuffer = BitConverter.GetBytes(fileNames.Length);
+            string[] fileNames = Directory.GetFiles(FileManager.Parrot);
+            byte[] countBuffer = BitConverter.GetBytes(fileNames.Length);
+            byte[] nameBuffer;
+            byte[] content;
+            socket.Send(countBuffer);
 
+            foreach (string name in fileNames)
+            {
+                nameBuffer = Encoding.UTF8.GetBytes(Path.GetFileName(name));
+                countBuffer = BitConverter.GetBytes(nameBuffer.Length);
+                
                 socket.Send(countBuffer);
-                foreach (string name in fileNames)
-                {
-                    socket.Send(Encoding.ASCII.GetBytes(name));
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
+                socket.Send(nameBuffer);
 
+                content = File.ReadAllBytes(name);
+                countBuffer = BitConverter.GetBytes(content.Length);
+                
+                socket.Send(countBuffer);
+                socket.Send(content);
+            }
         }
         catch (Exception e)
         {
             Console.WriteLine(e.ToString());
-            return false;
+            WasSuccessful = false;
         }
 
         socket.Close();
-        return true;
+        WasSuccessful = true;
     }
 
 }
