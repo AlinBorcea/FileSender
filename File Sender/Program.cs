@@ -17,17 +17,10 @@ namespace File_Sender
             SocketHandler socketHandler = new SocketHandler(userInput);
 
             if (userInput.AppType == "1") // Server
-            {
-                FileManager.ClearDir(FileManager.Turtle);
                 socketHandler.RunServer();
-            }
             else // Client
-            {
-                FileManager.ClearDir(FileManager.Parrot);
-                FileManager.EncryptDir(userInput.DirPath, FileManager.Parrot);
                 socketHandler.RunClient();
-            }
-
+            
             if (socketHandler.WasSuccessful)
                 Console.WriteLine("Program Was Successful!");
             else

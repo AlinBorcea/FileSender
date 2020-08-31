@@ -56,8 +56,8 @@ public class UserInput
             return UserInputError.DirPathErr;
         }
 
-        if (files.Length < 1)
-            return UserInputError.DirEmptyErr;
+       // if (files.Length < 1)
+         //   return UserInputError.DirEmptyErr;
         
         if (AppType != "1" && AppType != "2")
             return UserInputError.AppTypeErr;

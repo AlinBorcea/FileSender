@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text;
 
 public class SocketHandler
@@ -40,31 +41,37 @@ public class SocketHandler
             Socket handler = socket.Accept();
             Console.WriteLine("Connected to {0}", handler.RemoteEndPoint.ToString());
 
-            FileStream stream;
+            Console.Write("One Time Password... ");
+            string password = Console.ReadLine();
+
+            FileStream fs;
             byte[] countBuffer = new byte[4];
+            byte[] salt = new byte[16];
             byte[] nameBuffer;
-            byte[] contentBuffer;
-            int fileCount, recvBytes;
+            byte[] contentBuffer = new byte[1024];
+            int recv;
 
+            handler.Receive(salt);
             handler.Receive(countBuffer);
-            fileCount = BitConverter.ToInt32(countBuffer);
 
-            for (int i = 0; i < fileCount; i++)
+            Rfc2898DeriveBytes pass = new Rfc2898DeriveBytes(password, salt);
+            byte[] key = pass.GetBytes(16);
+
+            FileManager.ClearDir(FileManager.Turtle);
+            for (int i = 0; i < BitConverter.ToInt32(countBuffer); i++)
             {
                 handler.Receive(countBuffer);
-                recvBytes = BitConverter.ToInt32(countBuffer);
-                nameBuffer = new byte[recvBytes];
+                nameBuffer = new byte[BitConverter.ToInt32(countBuffer)];
                 handler.Receive(nameBuffer);
+                string str2 = Encoding.UTF8.GetString(nameBuffer);
+                fs = File.Create($"{FileManager.Turtle}/{str2}");
 
-                stream = File.Create($"{FileManager.Turtle}/{Encoding.UTF8.GetString(nameBuffer)}");
+                while ((recv = handler.Receive(contentBuffer)) > 0)
+                    fs.Write(contentBuffer, 0, recv);
 
-                handler.Receive(countBuffer);
-                recvBytes = BitConverter.ToInt32(countBuffer);
-                contentBuffer = new byte[recvBytes];
-                handler.Receive(contentBuffer);
-
-                stream.Write(contentBuffer);
-                stream.Close();
+                fs.Close();
+                string str = Encoding.UTF8.GetString(nameBuffer);
+                FileManager.DecryptFile(user.DirPath, str, key, salt);
             }
 
             handler.Close();
@@ -87,25 +94,42 @@ public class SocketHandler
             socket.Connect(iPEndPoint);
             Console.WriteLine("Connected to {0}", socket.RemoteEndPoint.ToString());
 
-            string[] fileNames = Directory.GetFiles(FileManager.Parrot);
+            // Encryption
+            Console.Write("One Time Password... ");
+            string password = Console.ReadLine();
+            byte[] salt = new byte[16];
+
+            using (RNGCryptoServiceProvider rng = new RNGCryptoServiceProvider())
+            {
+                rng.GetBytes(salt);
+            }
+
+            Rfc2898DeriveBytes pass = new Rfc2898DeriveBytes(password, salt);
+            byte[] key = pass.GetBytes(16);
+
+            // File properties
+            FileStream fs;
+            string[] fileNames = Directory.GetFiles(user.DirPath);
             byte[] countBuffer = BitConverter.GetBytes(fileNames.Length);
             byte[] nameBuffer;
-            byte[] content;
+            byte[] contentBuffer = new byte[1024];
+            int recv;
+
+            socket.Send(salt);
             socket.Send(countBuffer);
 
+            FileManager.ClearDir(FileManager.Parrot);
             foreach (string name in fileNames)
             {
+                FileManager.EncryptFile(name, key, salt);
+                fs = File.OpenRead($"{FileManager.Parrot}/{Path.GetFileName(name)}");
                 nameBuffer = Encoding.UTF8.GetBytes(Path.GetFileName(name));
-                countBuffer = BitConverter.GetBytes(nameBuffer.Length);
-                
-                socket.Send(countBuffer);
+                socket.Send(BitConverter.GetBytes(nameBuffer.Length));
                 socket.Send(nameBuffer);
+                while ((recv = fs.Read(contentBuffer, 0, 1024)) > 0)
+                    socket.Send(contentBuffer);
 
-                content = File.ReadAllBytes(name);
-                countBuffer = BitConverter.GetBytes(content.Length);
-                
-                socket.Send(countBuffer);
-                socket.Send(content);
+                fs.Close();
             }
         }
         catch (Exception e)

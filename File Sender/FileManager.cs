@@ -8,35 +8,39 @@ public class FileManager
     public const string Parrot = "parrot";
     public const string Turtle = "turtle";
 
-    public static void EncryptDir(string src, string dirName, string password)
+
+    public static void EncryptFile(string filePath, byte[] key, byte[] salt)
     {
-        string[] fileNames = Directory.GetFiles(src);
-        AesCryptoServiceProvider acsp = new AesCryptoServiceProvider();
-        acsp.GenerateKey();
-        acsp.GenerateIV();
+        FileStream infs = new FileStream(filePath, FileMode.Open);
+        FileStream outfs = File.Create($"{Parrot}/{Path.GetFileName(filePath)}");
+        CryptoStream crypto = new CryptoStream(outfs, Aes.Create().CreateEncryptor(key, salt), CryptoStreamMode.Write);
+        
+        byte[] b = new byte[4];
+        int read;
 
-        ICryptoTransform cryptoTransf = Aes.Create().CreateEncryptor(acsp.Key, acsp.IV);
-
-        foreach (string name in fileNames)
-        {
-            FileStream trgtStrm = File.Create($"{dirName}/{Path.GetFileName(name)}");
-            string srcstr = File.ReadAllText(name);
-
-            CryptoStream crypto = new CryptoStream(trgtStrm, cryptoTransf, CryptoStreamMode.Write);
-            StreamWriter swriter = new StreamWriter(crypto);
-
-            foreach (char c in srcstr)
-                swriter.Write(c);
-
-            swriter.Close();
-            crypto.Close();
-            trgtStrm.Close();
-        }
+        while ((read = infs.Read(b, 0, b.Length)) > 0)
+            crypto.Write(b, 0, read);
+        
+        crypto.Close();
+        infs.Close();
+        outfs.Close();
     }
 
-    public static void DecryptDir(string dest, string dir, string password)
+    public static void DecryptFile(string dirPath, string fileName, byte[] key, byte[] salt)
     {
-        string[] fileNames = Directory.GetFiles(dir);
+        FileStream infs = File.OpenRead($"{Turtle}/{fileName}");
+        FileStream outfs = File.Create($"{dirPath}/{fileName}");
+        CryptoStream crypto = new CryptoStream(outfs, Aes.Create().CreateDecryptor(key, salt), CryptoStreamMode.Read);
+
+        byte[] b = new byte[4];
+        int read;
+
+        while ((read = crypto.Read(b, 0, b.Length)) > 0)
+            outfs.Write(b, 0, read);
+
+        crypto.Close();
+        infs.Close();
+        outfs.Close();
     }
 
     public static void ClearDir(string dirName)
@@ -58,7 +62,5 @@ public class FileManager
             return;
         }
     }
-
-
 
 }
