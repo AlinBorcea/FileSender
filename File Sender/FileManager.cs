@@ -14,13 +14,13 @@ public class FileManager
         FileStream infs = new FileStream(filePath, FileMode.Open);
         FileStream outfs = File.Create($"{Parrot}/{Path.GetFileName(filePath)}");
         CryptoStream crypto = new CryptoStream(outfs, Aes.Create().CreateEncryptor(key, salt), CryptoStreamMode.Write);
-        
+
         byte[] b = new byte[4];
         int read;
 
         while ((read = infs.Read(b, 0, b.Length)) > 0)
             crypto.Write(b, 0, read);
-        
+
         crypto.Close();
         infs.Close();
         outfs.Close();
@@ -45,12 +45,6 @@ public class FileManager
 
     public static void ClearDir(string dirName)
     {
-        if (dirName != Parrot && dirName != Turtle)
-        {
-            Console.WriteLine($"Directory must be {Turtle} or {Parrot}");
-            Environment.Exit(1);
-        }
-        
         try
         {
             string[] fileNames = Directory.GetFiles(dirName);
@@ -59,6 +53,7 @@ public class FileManager
         }
         catch (Exception e)
         {
+            Console.WriteLine(e.ToString());
             return;
         }
     }
